@@ -19,20 +19,22 @@ class StreamingOutput(object):
         return self.buffer.write(buf)
 
 class Stream(object):
+    def __init__(self):
+        self.output = StreamingOutput()
+        self.condition = Condition()
+
     def start_recording(self):
         with picamera.PiCamera(resolution='640x480', framerate=30) as camera:
             self.camera = camera
-            self.output = StreamingOutput()
-            self.camera.start_recording(self.output, format='mjpeg')        
+            self.camera.start_recording(self.output, format='mjpeg')
+            with self.condition:
+                self.condition.wait()
+            self.camera.stop_recording()
     
     def frame_generator(self):
-        try:
-            while True:
-                with self.output.condition:
-                    self.output.condition.wait()
-                    frame = self.output.frame
-                    yield(b'--FRAME\r\n' +
-                          b'Content-Type: image/jpeg\r\n\r\n' + 
-                          frame + b'\r\n')
-        except Exception as e:
-            logging.warning('Removed streaming client %s: %s', self.client_address, str(e))
+        while True:
+            with self.output.condition:
+                self.output.condition.wait()
+                frame = self.output.frame
+                yield(b'--frame\r\n'
+                      b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')

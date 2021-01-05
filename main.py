@@ -15,7 +15,7 @@ HOME_PAGE="""\
 </head>
 <body>
 <center><h1 style="font-family:sans-serif">RoboCleanX [RPi3]</h1></center>
-<center><img src="stream.mjpg" width="640" height="480"></center>
+<center><img src="http://127.0.0.1:8000/camera-stream/stream.mjpg" width="640" height="480"></center>
 <center><button onclick="location.href='http://{}:{}/terminate.html'" type="button">Terminate</button></center
 </body>
 </html>
@@ -109,11 +109,5 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-with picamera.PiCamera(resolution='640x480', framerate=30) as camera:
-    output = StreamingOutput()
-    camera.start_recording(output, format='mjpeg')
-    try:
-        server = StreamingServer(address, StreamingHandler)
-        server.serve_forever()
-    finally:
-        camera.stop_recording()
+server = StreamingServer(address, StreamingHandler)
+server.serve_forever()
