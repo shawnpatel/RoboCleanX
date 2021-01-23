@@ -7,12 +7,10 @@
   <body>
     <center>
       <h1 style="font-family:sans-serif">RoboCleanX [Stream]</h1>
-    </center>
-    <center>
-      <img src="stream.mjpg" width="640" height="480">
-    </center>
-    <center>
-      <button onclick="location.href='https://google.com'" type="button">Terminate</button>
+      <img src="{{ url_for('stream') }}" width="640" height="480">
+      <form action="{{ url_for('terminate') }}">
+        <input type="submit" value="Terminate"/>
+      </form>
     </center>
   </body>
 </html>

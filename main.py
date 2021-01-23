@@ -1,113 +1,26 @@
-import io
-import picamera
-import logging
+from flask import Flask, Response, render_template
 import socket
-import socketserver
-from threading import Condition
-from http import server
+from camera_stream import CameraStream
 
-address = ("{}.lan".format(socket.gethostname()), 8000)
+app = Flask(__name__)
 
-HOME_PAGE="""\
-<html>
-<head>
-<title>RoboCleanX (RPi3)</title>
-</head>
-<body>
-<center><h1 style="font-family:sans-serif">RoboCleanX [RPi3]</h1></center>
-<center><img src="http://127.0.0.1:8000/camera-stream/stream.mjpg" width="640" height="480"></center>
-<center><button onclick="location.href='http://{}:{}/terminate.html'" type="button">Terminate</button></center
-</body>
-</html>
-""".format(address[0], address[1])
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-TERMINATION_PAGE="""\
-<html>
-<head>
-<title>Terminated RoboCleanX (RPi3)</title>
-</head>
-<body>
-<center><h1 style="font-family:sans-serif">Terminated RoboCleanX [RPi3]</h1></center>
-</body>
-</html>
-"""
+@app.route("/stream")
+def stream():
+    camera_stream = CameraStream()
+    return Response(camera_stream.frame_generator(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
-class StreamingOutput(object):
-    def __init__(self):
-        self.frame = None
-        self.buffer = io.BytesIO()
-        self.condition = Condition()
+@app.route("/terminate")
+def terminate():
+    return "Terminated."
 
-    def write(self, buf):
-        if buf.startswith(b'\xff\xd8'):
-            self.buffer.truncate()
-            with self.condition:
-                self.frame = self.buffer.getvalue()
-                self.condition.notify_all()
-            self.buffer.seek(0)
-        return self.buffer.write(buf)
+def main():
+    host = "{}.lan".format(socket.gethostname())
+    port = 8000
+    app.run(host=host, port=port, debug=True)
 
-class StreamingHandler(server.BaseHTTPRequestHandler):
-    def go_to(self, page):
-        self.send_response(301)
-        self.send_header('Location', '/{}.html'.format(page))
-        self.end_headers()
-
-    def do_GET(self):
-        if self.path == '/':
-            self.go_to("stream")
-        elif self.path == '/index.html':
-            self.go_to("stream")
-        elif self.path == '/stream':
-            self.go_to("stream")
-        elif self.path == '/stream.html':
-            content = HOME_PAGE.encode('utf-8')
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html')
-            self.send_header('Content-Length', len(content))
-            self.end_headers()
-            self.wfile.write(content)
-        elif self.path == '/stream.mjpg':
-            self.send_response(200)
-            self.send_header('Age', 0)
-            self.send_header('Cache-Control', 'no-cache, private')
-            self.send_header('Pragma', 'no-cache')
-            self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
-            self.end_headers()
-            try:
-                while True:
-                    with output.condition:
-                        output.condition.wait()
-                        frame = output.frame
-                    self.wfile.write(b'--FRAME\r\n')
-                    self.send_header('Content-Type', 'image/jpeg')
-                    self.send_header('Content-Length', len(frame))
-                    self.end_headers()
-                    self.wfile.write(frame)
-                    self.wfile.write(b'\r\n')
-            except Exception as e:
-                logging.warning('Removed streaming client %s: %s',
-                                self.client_address, str(e))
-        elif self.path == '/terminate':
-            self.go_to("terminate")
-        elif self.path =="/terminate.html":
-            logging.warning("Terminating stream.")
-
-            content = TERMINATION_PAGE.encode('utf-8')
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/html')
-            self.send_header('Content-Length', len(content))
-            self.end_headers()
-            self.wfile.write(content)
-
-            server.shutdown()
-        else:
-            self.send_error(404)
-            self.end_headers()
-
-class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
-    allow_reuse_address = True
-    daemon_threads = True
-
-server = StreamingServer(address, StreamingHandler)
-server.serve_forever()
+if __name__ == "__main__":
+    main()
