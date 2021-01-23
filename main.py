@@ -11,9 +11,9 @@ def index():
 @app.route("/stream")
 def stream():
     camera_stream = CameraStream()
-    camera_stream.start()
+    #camera_stream.start()
 
-    return Response(camera_stream.frame_generator(), mimetype="multipart/x-mixed-replace; boundary=frame")
+    return Response(camera_stream.old_frame_generator(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
 @app.route("/terminate")
 def terminate():
@@ -22,7 +22,7 @@ def terminate():
 def main():
     host = "{}.lan".format(socket.gethostname())
     port = 8000
-    app.run(host=host, port=port, debug=True)
+    app.run(host=host, port=port, debug=False)
 
 if __name__ == "__main__":
     main()
