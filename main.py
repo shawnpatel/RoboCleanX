@@ -11,6 +11,8 @@ def index():
 @app.route("/stream")
 def stream():
     camera_stream = CameraStream()
+    camera_stream.start()
+
     return Response(camera_stream.frame_generator(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
 @app.route("/terminate")
