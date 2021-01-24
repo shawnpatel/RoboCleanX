@@ -12,6 +12,9 @@ class CameraStream():
         self.camera.set(cv.CAP_PROP_FOURCC, cv.VideoWriter_fourcc('M','J','P','G'))
         self.camera.set(cv.CAP_PROP_FPS, 15) # FPS
 
+        self.focal_length = (93.73575 * 30) / 5 # (pixel_width * distance) / width
+        self.object_width = 5
+
         #self.camera.set(cv.CAP_PROP_BRIGHTNESS, 1) # Brightness
         #self.camera.set(cv.CAP_PROP_CONTRAST, 0.75) # Contrast
         #self.camera.set(cv.CAP_PROP_SATURATION, 0.75) # Saturation
@@ -19,7 +22,7 @@ class CameraStream():
         #self.camera.set(cv.CAP_PROP_GAIN, 1) # Gain
         #self.camera.set(cv.CAP_PROP_EXPOSURE, 0.5) # Exposure
 
-    def start(self):
+    """def start(self):
         self.success = None
         self.frame = None
 
@@ -61,16 +64,16 @@ class CameraStream():
                     time.sleep(0.05)
         except GeneratorExit:
             print("Generator closed!")
-            self.terminate()
+            self.terminate()"""
     
-    def old_frame_generator(self):
+    def frame_generator(self):
         try:
             while True:
                 success, frame = self.camera.read()
 
                 if not success:
                     print("Unable to get frame from camera.")
-                    self.old_terminate()
+                    self.terminate()
                     break
                 else:
                     frame = self.__process_image(frame)
@@ -81,9 +84,9 @@ class CameraStream():
                         b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
         except GeneratorExit:
             print("Generator closed!")
-            self.old_terminate()
+            self.terminate()
     
-    def __is_bad_contour(self, contour):
+    def __filter_contour(self, contour):
         area = cv.contourArea(contour)
         peri = cv.arcLength(contour, True)
         approx_poly = cv.approxPolyDP(contour, 0.02 * peri, True)
@@ -97,15 +100,18 @@ class CameraStream():
             angle = abs(90 - rotated_rect[2])
 
         if area < 500:
-            return True
+            return (None, None)
         elif len(approx_poly) > 15:
-            return True
+            return (None, None)
         elif angle > 10:
-            return True
+            return (None, None)
         elif height > width: 
-            return True
+            return (None, None)
         
-        return False
+        return (contour, width)
+
+    def __get_distance(self, pixel_width):
+        return (self.object_width * self.focal_length) / pixel_width
 
     def __process_image(self, frame):
         hsv_frame = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
@@ -120,10 +126,13 @@ class CameraStream():
 
         bad_contours = []
         good_contours = []
+        distances = []
         for contour in contours:
-            if self.__is_bad_contour(contour):
+            filtered_contour, width = self.__filter_contour(contour)
+            if width == None:
                 bad_contours.append(contour)
             else:
+                distances.append(self.__get_distance(width))
                 good_contours.append(contour)
                 
         cv.drawContours(bad_contours_mask, bad_contours, -1, 0, -1)
@@ -133,19 +142,24 @@ class CameraStream():
 
         cv.drawContours(result_frame, good_contours, -1, (0,255,0), 1)
 
+        distance = np.round(np.mean(distances))
+        distance = str(distance) if distance != np.nan else distance
+
+        font = cv.FONT_HERSHEY_SIMPLEX
+        cv.putText(result_frame, str(distance) + " cm", (10,450), font, 1, (0, 255, 0), 2, cv.LINE_AA)
+
         return result_frame
     
-    def terminate(self):
+    """def terminate(self):
         self.stop_thread = True
         
         self.thread.join()
         self.camera.release()
-        cv.destroyAllWindows()
+        cv.destroyAllWindows()"""
     
-    def old_terminate(self):
+    def terminate(self):
         self.camera.release()
         cv.destroyAllWindows()
     
     def __del__(self):
-        #self.terminate()
-        self.old_terminate()
+        self.terminate()
