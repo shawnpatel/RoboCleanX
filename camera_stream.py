@@ -87,13 +87,22 @@ class CameraStream():
         area = cv.contourArea(contour)
         peri = cv.arcLength(contour, True)
         approx_poly = cv.approxPolyDP(contour, 0.02 * peri, True)
-        rotated_rect = rect = cv.minAreaRect(contour)
+        rotated_rect = cv.minAreaRect(contour)
+
+        width = rotated_rect[1][0]
+        height = rotated_rect[1][1]
+        angle = abs(rotated_rect[2])
+        if abs(90 - rotated_rect[2]) < angle:
+            width, height = height, width
+            angle = abs(90 - rotated_rect[2])
 
         if area < 500:
             return True
-        elif len(approx_poly) > 10:
+        elif len(approx_poly) > 15:
             return True
-        elif rotated_rect.angle > 5 or rotatted_rect.angle < -5:
+        elif angle > 10:
+            return True
+        elif height > width: 
             return True
         
         return False
